@@ -3,8 +3,10 @@ import argparse
 parser = argparse.ArgumentParser(description='AtariZero: PyTorch AI of Atari Game')
 
 # General Settings
-parser.add_argument('--env', default='MsPacman-v0', type=str,
+parser.add_argument('--env', default='Pong-v0', type=str,
                     help='Name of the atari game')
+parser.add_argument('--save_interval', default=120, type=int,
+                    help='Time interval (in minutes) at which to save the model')
 
 # Training settings
 parser.add_argument('--gpu_devices', default='0', type=str,

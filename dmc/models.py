@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 class AtariRGB(nn.Module):
@@ -23,14 +23,16 @@ class AtariRGB(nn.Module):
         )
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.classifier = nn.Sequential(
-            nn.Linear(256, 256),
+            nn.Linear(256 + 6, 256),
             nn.Linear(256, 256),
             nn.Linear(256, 1),
         )
 
     def forward(self, s, a, return_value=False, flags=None):
+        # print(s.shape, a.shape, type(s), type(a))
         s = self.features(s)
         s = self.avgpool(s)
+        s = s.view(s.shape[0], -1)
         x = torch.cat((s, a), dim=1)
         val = self.classifier(x)
         if return_value:
@@ -52,8 +54,8 @@ class Model:
     def __init__(self, device=0):
         self.model = AtariRGB().to(torch.device('cuda:' + str(device)))
 
-    def forward(self, x, training=False, flags=None):
-        return self.model.forward(x, training, flags)
+    def forward(self, s, a, training=False, flags=None):
+        return self.model.forward(s, a, training, flags)
 
     def share_memory(self):
         # You can use the share_memory() function on an nn.Module so that
@@ -69,3 +71,11 @@ class Model:
 
     def get_model(self):
         return self.model
+
+
+# if __name__ == '__main__':
+#     model = Model()
+#     B = 10
+#     s = torch.rand(B, 3, 210, 160).to(torch.device('cuda:0'))
+#     a = torch.rand(B, 9).to(torch.device('cuda:0'))
+#     out = model.forward(s, a)

@@ -1,131 +1,135 @@
-import copy
+import numpy as np
+import traceback
+import torch
+
+from env.atari_env import create_env
+from dmc.env_utils import Environment
 
 
-def assignment_copy_deepcopy():
-    """ Take care of the difference of assignment, copy and deepcopy. """
-    print("不可变对象:")
-    # 不可变对象类型，没有被拷贝的说法，或者说，不可变类型，不管是深拷贝还是浅拷贝，
-    # 地址值和拷贝后的值都是一样的。
-    a1 = (1, 2, 3)
-    print("===== 赋值 =====")
-    b1 = a1
-    print(a1)
-    print(b1)
-    print(id(a1))
-    print(id(b1))
-    print("===== 浅拷贝 =====")
-    b2 = copy.copy(a1)
-    print(a1)
-    print(b2)
-    print(id(a1))
-    print(id(b2))
-    print("===== 深拷贝 =====")
-    b3 = copy.deepcopy(a1)
-    print(a1)
-    print(b3)
-    print(id(a1))
-    print(id(b3))
-
-    print("\n可变对象:")
-    # 赋值： 值相等，地址相等
-    # copy浅拷贝：值相等，地址不相等
-    # deepcopy深拷贝：值相等，地址不相等
-    print("===== 赋值 =====")
-    a1 = [1, 2, 3]
-    b1 = a1
-    print(a1)
-    print(b1)
-    print(id(a1))
-    print(id(b1))
-    b1.append(4)
-    print("-> b1.append(4)")
-    print(a1)
-    print(b1)
-    print(id(a1))
-    print(id(b1))
-    print("===== 浅拷贝 =====")
-    a2 = [1, 2, 3]
-    b2 = copy.copy(a2)
-    print(a2)
-    print(b2)
-    print(id(a2))
-    print(id(b2))
-    b2.append(4)
-    print("-> b2.append(4)")
-    print(a2)
-    print(b2)
-    print(id(a2))
-    print(id(b2))
-    print("===== 深拷贝 =====")
-    a3 = [1, 2, 3]
-    b3 = copy.deepcopy(a3)
-    print(a3)
-    print(b3)
-    print(id(a3))
-    print(id(b3))
-    b3.append(4)
-    print("-> b3.append(4)")
-    print(a3)
-    print(b3)
-    print(id(a3))
-    print(id(b3))
-
-    # ------------------------------------
-    # 1.赋值对象随着原列表一起变化。
-    # (赋值并不会产生一个独立的对象单独存在)
-    # 2.外层添加元素时，浅拷贝不会随原列表变化而变化；内层添加元素时，浅拷贝才会变化。
-    # (浅拷贝之所以称为浅拷贝，是它仅仅只拷贝了一层，拷贝了最外围的对象本身，内部的元素都只是拷贝了一个引用而已)
-    # 3.无论原列表如何变化，深拷贝都保持不变。
-    # (深拷贝出来的对象是一个全新的对象，不再与原来的对象有任何关联。)
-    # ------------------------------------
-    print("\n可变对象(外层改变元素):")
-    l = [1, 2, 3, [4, 5]]
-    l1 = l  # 赋值
-    l2 = copy.copy(l)  # 浅拷贝
-    l3 = copy.deepcopy(l)  # 深拷贝
-    print(l)
-    print(l1)
-    print(l2)
-    print(l3)
-    print(id(l))
-    print(id(1))
-    print(id(l2))
-    print(id(l3))
-    l.append(6)
-    print("-> l.append(6)")
-    print(l)
-    print(l1)
-    print(l2)
-    print(l3)
-    print(id(l))
-    print(id(1))
-    print(id(l2))
-    print(id(l3))
-
-    print("\n可变对象(内层改变元素):")
-    l = [1, 2, 3, [4, 5]]
-    l1 = l  # 赋值
-    l2 = copy.copy(l)  # 浅拷贝
-    l3 = copy.deepcopy(l)  # 深拷贝
-    print(l)
-    print(l1)
-    print(l2)
-    print(l3)
-    print(id(l))
-    print(id(1))
-    print(id(l2))
-    print(id(l3))
-    l[3].append(6)
-    print("-> l[3].append(6)")
-    print(l)
-    print(l1)
-    print(l2)
-    print(l3)
-    print(id(l))
-    print(id(1))
-    print(id(l2))
-    print(id(l3))
+Action2Onehot = {0: np.array([1, 0, 0, 0, 0, 0]),
+                 1: np.array([0, 1, 0, 0, 0, 0]),
+                 2: np.array([0, 0, 1, 0, 0, 0]),
+                 3: np.array([0, 0, 0, 1, 0, 0]),
+                 4: np.array([0, 0, 0, 0, 1, 0]),
+                 5: np.array([0, 0, 0, 0, 0, 1])}
 
 
-# if __name__ == '__main__':
-#     assignment_copy_deepcopy()
+def action2onehot(action):
+    return Action2Onehot[action]
+
+
+def create_optimizers(flags, learner_model):
+    optimizer = torch.optim.RMSprop(
+        learner_model.parameters(),
+        lr=flags.learning_rate,
+        momentum=flags.momentum,
+        eps=flags.epsilon,
+        alpha=flags.alpha
+    )
+    return optimizer
+
+
+def act(i, device, free_queue, full_queue, model, buffers, flags):
+    """
+    This function will run forever until we stop it. It will generate
+    data from the environment and send the data to buffer. It uses
+    a free queue and full queue to synchronize with the main process.
+    """
+    try:
+        print("Device {} Actor {} started.".format(device, i))
+
+        T = flags.unroll_length
+
+        env = create_env(flags)
+        env = Environment(env, device)
+
+        done_buf = []
+        episode_return_buf = []
+        target_buf = []
+        obs_s_buf = []
+        obs_a_buf = []
+        buf_size = 0
+
+        env_output = env.reset()
+
+        while True:
+            while True:
+                obs_s_buf.append(env_output['obs_s'])
+                with torch.no_grad():
+                    agent_output = model.forward(env_output['obs_s'], env_output['obs_a'], flags=flags)
+                action = int(agent_output['action'].cpu().detach().numpy())
+                obs_a_buf.append(action2onehot(action))
+                env_output = env.step(action)
+                buf_size += 1
+                if env_output['done']:
+                    diff = buf_size - len(target_buf)
+                    if diff > 0:
+                        done_buf.extend([False for _ in range(diff - 1)])
+                        done_buf.append(True)
+
+                        episode_return = env_output['episode_return']
+                        episode_return_buf.extend([0.0 for _ in range(diff - 1)])
+                        episode_return_buf.append(episode_return)
+                        # discount factor is 0, i.e., target_buf is filled with the episode_return
+                        target_buf.extend([episode_return for _ in range(diff)])
+                    break
+
+            if buf_size > T:
+                index = free_queue.get()  # get(): Remove and return thr index of a free entry from the queue.
+                if index is None:
+                    break
+                for t in range(T):
+                    buffers['done'][index][t, ...] = done_buf[t]
+                    buffers['episode_return'][index][t, ...] = episode_return_buf[t]
+                    buffers['target'][index][t, ...] = target_buf[t]
+                    buffers['obs_s'][index][t, ...] = obs_s_buf[t]
+                    buffers['obs_a'][index][t, ...] = obs_a_buf[t]
+                full_queue.put(index)  # put(): Put the index of a full entry into the queue.
+
+                # Free transitions that have been buffered.
+                done_buf = done_buf[T:]
+                episode_return_buf = episode_return_buf[T:]
+                target_buf = target_buf[T:]
+                obs_s_buf = obs_s_buf[T:]
+                obs_a_buf = obs_a_buf[T:]
+                buf_size -= T
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        print("Exception in worker process {}".format(i))
+        traceback.print_exc()
+        raise e
+
+
+def compute_loss(logits, targets):
+    loss = ((logits.squeeze(-1) - targets) ** 2).mean()
+    return loss
+
+
+def learn(actor_models, model, batch, optimizer, flags, lock):
+    """ Perform a learning (optimization) step. """
+    device = torch.device('cuda:' + str(flags.training_device))
+    obs_s = batch['obs_s'].to(device)
+    obs_a = batch['obs_a'].to(device)
+    target = torch.flatten(batch['target'].to(device), 0, 1)
+    episode_returns = batch['episode_return'][batch['done']]
+
+    with lock:
+        # multiple threads might have to acquire/wait a lock
+        # print("----- {} -- {} : {}".format(os.getpid(), threading.currentThread().ident, id(lock)))
+        learner_outputs = model(obs_s, obs_a, return_value=True)
+        loss = compute_loss(learner_outputs['values'], target)
+        stats = {
+            'mean_episode_return': torch.mean(episode_returns).item(),
+            'loss': loss.item(),
+        }
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # update actor models from the learn model
+        for actor_model in actor_models:
+            actor_model.get_model().load_state_dict(model.state_dict())
+
+        return stats
