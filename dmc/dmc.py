@@ -11,18 +11,20 @@ from .utils import create_optimizers, act, learn
 
 
 def train(flags):
+    ram_env = True if 'ram' in flags.env else False
+
     # Initialize actor models
     models = []
     assert flags.num_actor_devices <= len(flags.gpu_devices.split(',')), \
         'The number of actor devices can not exceed the number of available devices'
     for device in range(flags.num_actor_devices):
-        model = Model(device=device)
+        model = Model(action_dim=6, device=device, ram=ram_env)
         model.share_memory()
         model.eval()
         models.append(model)
 
     # Initialize buffers
-    buffers = create_buffers(flags)  # each device has three buffers for the three positions.
+    buffers = create_buffers(flags, ram_env)  # each device has three buffers for the three positions.
 
     # Initialize queues
     actor_processes = []
@@ -44,7 +46,7 @@ def train(flags):
             free_queue[device].put(m)
 
     # Learner model for training
-    learner_model = Model(device=flags.training_device)
+    learner_model = Model(action_dim=6, device=flags.training_device, ram=ram_env)
 
     # Create optimizers
     optimizer = create_optimizers(flags, learner_model)  # each position has a sole optimizer.
@@ -92,6 +94,8 @@ def train(flags):
                 # all threads have to acquire/wait this lock
                 # print("----- {} -- {} : {}".format(os.getpid(), threading.currentThread().ident, id(lock)))
                 frames += T * B
+                print("Frame: {:12d} -- loss: {:.6f}, mean episode return: {}".format(
+                    frames, _stats['loss'], _stats['mean_episode_return']))
 
     threads = []
     local_locks = [threading.Lock() for _ in range(flags.num_actor_devices)]

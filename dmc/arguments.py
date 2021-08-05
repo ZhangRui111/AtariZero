@@ -3,7 +3,8 @@ import argparse
 parser = argparse.ArgumentParser(description='AtariZero: PyTorch AI of Atari Game')
 
 # General Settings
-parser.add_argument('--env', default='Pong-v0', type=str,
+parser.add_argument('--env', default='Pong-ram-v0', type=str,
+                    choices=['Pong-v0', 'Pong-ram-v0'],
                     help='Name of the atari game')
 parser.add_argument('--save_interval', default=120, type=int,
                     help='Time interval (in minutes) at which to save the model')
@@ -39,7 +40,7 @@ parser.add_argument('--num_buffers', default=50, type=int,
                     help='Number of shared-memory buffers')
 
 # Optimizer settings
-parser.add_argument('--learning_rate', default=0.0001, type=float,
+parser.add_argument('--learning_rate', default=0.00002, type=float,
                     help='Learning rate')
 parser.add_argument('--alpha', default=0.99, type=float,
                     help='RMSProp smoothing constant')

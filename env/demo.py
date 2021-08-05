@@ -1,6 +1,7 @@
 import gym
 
-env = gym.make('Pong-v0')
+# env = gym.make('Pong-v0')
+env = gym.make('Pong-ram-v0')
 
 for i_episode in range(1):
     step_episode = 0

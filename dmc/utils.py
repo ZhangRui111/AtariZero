@@ -15,7 +15,7 @@ Action2Onehot = {0: np.array([1, 0, 0, 0, 0, 0]),
 
 
 def action2onehot(action):
-    return Action2Onehot[action]
+    return torch.from_numpy(Action2Onehot[action])
 
 
 def create_optimizers(flags, learner_model):
@@ -54,7 +54,7 @@ def act(i, device, free_queue, full_queue, model, buffers, flags):
 
         while True:
             while True:
-                obs_s_buf.append(env_output['obs_s'])
+                obs_s_buf.append(env_output['obs_s'][0, ...])
                 with torch.no_grad():
                     agent_output = model.forward(env_output['obs_s'], env_output['obs_a'], flags=flags)
                 action = int(agent_output['action'].cpu().detach().numpy())
@@ -111,7 +111,7 @@ def learn(actor_models, model, batch, optimizer, flags, lock):
     device = torch.device('cuda:' + str(flags.training_device))
     obs_s = batch['obs_s'].to(device)
     obs_a = batch['obs_a'].to(device)
-    target = torch.flatten(batch['target'].to(device), 0, 1)
+    target = batch['target'].to(device)
     episode_returns = batch['episode_return'][batch['done']]
 
     with lock:
@@ -123,7 +123,6 @@ def learn(actor_models, model, batch, optimizer, flags, lock):
             'mean_episode_return': torch.mean(episode_returns).item(),
             'loss': loss.item(),
         }
-
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()

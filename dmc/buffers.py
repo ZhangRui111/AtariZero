@@ -7,7 +7,7 @@ import typing
 Buffers = typing.Dict[str, typing.List[torch.Tensor]]
 
 
-def create_buffers(flags):
+def create_buffers(flags, ram=False):
     """
     We create buffers for different devices (i.e., GPU).
     That is, each device has a buffer.
@@ -16,13 +16,22 @@ def create_buffers(flags):
     buffers = []
     for device in range(torch.cuda.device_count()):
         buffers.append({})
-        specs = dict(
-            done=dict(size=(T,), dtype=torch.bool),
-            episode_return=dict(size=(T,), dtype=torch.float32),
-            target=dict(size=(T,), dtype=torch.float32),
-            obs_s=dict(size=(T, 210, 160, 3), dtype=torch.float32),
-            obs_a=dict(size=(T, 6), dtype=torch.int8),
-        )
+        if ram:
+            specs = dict(
+                done=dict(size=(T,), dtype=torch.bool),
+                episode_return=dict(size=(T,), dtype=torch.float32),
+                target=dict(size=(T,), dtype=torch.float32),
+                obs_s=dict(size=(T, 128), dtype=torch.float32),
+                obs_a=dict(size=(T, 6), dtype=torch.int8),
+            )
+        else:
+            specs = dict(
+                done=dict(size=(T,), dtype=torch.bool),
+                episode_return=dict(size=(T,), dtype=torch.float32),
+                target=dict(size=(T,), dtype=torch.float32),
+                obs_s=dict(size=(T, 3, 210, 160), dtype=torch.float32),
+                obs_a=dict(size=(T, 6), dtype=torch.int8),
+            )
         _buffers: Buffers = {key: [] for key in specs}
         for _ in range(flags.num_buffers):
             for key in _buffers:
